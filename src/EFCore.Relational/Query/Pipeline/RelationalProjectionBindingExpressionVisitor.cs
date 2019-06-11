@@ -3,6 +3,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -94,13 +96,51 @@ namespace Microsoft.EntityFrameworkCore.Relational.Query.Pipeline
                             Expression.Constant(parameterExpression.Name));
                     }
 
-                    if (expression is MethodCallExpression methodCallExpression
-                        && methodCallExpression.Method.Name == "MaterializeCollectionNavigation")
+                    if (expression is MethodCallExpression methodCallExpression)
                     {
-                        var result = _queryableMethodTranslatingExpressionVisitor.TranslateSubquery(methodCallExpression.Arguments[0]);
-                        var navigation = (INavigation)((ConstantExpression)methodCallExpression.Arguments[1]).Value;
+                        INavigation navigation = null;
+                        Expression source = methodCallExpression;
+                        if (methodCallExpression.Method.Name == "MaterializeCollectionNavigation")
+                        {
+                            navigation = (INavigation)((ConstantExpression)methodCallExpression.Arguments[1]).Value;
+                            source = methodCallExpression.Arguments[0];
+                        }
 
-                        return _selectExpression.AddCollectionProjection(result, navigation);
+                        var subqueryTranslation = _queryableMethodTranslatingExpressionVisitor.TranslateSubquery(source);
+                        if (subqueryTranslation != null)
+                        {
+                            if (subqueryTranslation.ResultType == ResultType.Enumerable)
+                            {
+                                return _selectExpression.AddCollectionProjection(subqueryTranslation, navigation);
+                            }
+                            else
+                            {
+                                if (subqueryTranslation.ShaperExpression is ProjectionBindingExpression)
+                                {
+                                    var subquery = (SelectExpression)subqueryTranslation.QueryExpression;
+                                    subquery.ApplyProjection();
+
+                                    if (methodCallExpression.Method.Name == nameof(Queryable.Any)
+                                        || methodCallExpression.Method.Name == nameof(Queryable.All)
+                                        || methodCallExpression.Method.Name == nameof(Queryable.Contains))
+                                    {
+                                        if (subquery.Tables.Count == 0
+                                            && subquery.Projection.Count == 1)
+                                        {
+                                            return subquery.Projection[0].Expression;
+                                        }
+
+                                        throw new InvalidOperationException();
+                                    }
+
+                                    return new SubSelectExpression(subquery);
+                                }
+                                else
+                                {
+                                    throw new NotImplementedException("Lift non-scalar single result in projection");
+                                }
+                            }
+                        }
                     }
 
                     var translation = _sqlTranslator.Translate(expression);
@@ -115,6 +155,54 @@ namespace Microsoft.EntityFrameworkCore.Relational.Query.Pipeline
                 }
                 else
                 {
+                    if (expression is MethodCallExpression methodCallExpression)
+                    {
+                        INavigation navigation = null;
+                        Expression source = methodCallExpression;
+                        if (methodCallExpression.Method.Name == "MaterializeCollectionNavigation")
+                        {
+                            navigation = (INavigation)((ConstantExpression)methodCallExpression.Arguments[1]).Value;
+                            source = methodCallExpression.Arguments[0];
+                        }
+
+                        var subqueryTranslation = _queryableMethodTranslatingExpressionVisitor.TranslateSubquery(source);
+                        if (subqueryTranslation != null)
+                        {
+                            var subquery = (SelectExpression)subqueryTranslation.QueryExpression;
+                            subquery.ApplyProjection();
+                            if (subqueryTranslation.ResultType == ResultType.Enumerable)
+                            {
+                                return _selectExpression.AddCollectionProjection(subqueryTranslation, navigation);
+                            }
+                            else
+                            {
+                                if (subquery.Projection.Count == 1)
+                                {
+                                    SqlExpression sqlTranslation;
+                                    if (methodCallExpression.Method.Name == nameof(Queryable.Any)
+                                        || methodCallExpression.Method.Name == nameof(Queryable.All)
+                                        || methodCallExpression.Method.Name == nameof(Queryable.Contains))
+                                    {
+                                        Debug.Assert(subquery.Tables.Count == 0, "Bool returning queryable method should only have projection.");
+                                        sqlTranslation = subquery.Projection[0].Expression;
+                                    }
+                                    else
+                                    {
+                                        sqlTranslation = new SubSelectExpression(subquery);
+                                    }
+
+                                    _projectionMapping[_projectionMembers.Peek()] = sqlTranslation;
+
+                                    return new ProjectionBindingExpression(_selectExpression, _projectionMembers.Peek(), expression.Type);
+                                }
+                                else
+                                {
+                                    throw new NotImplementedException("Lift non-scalar single result in projection");
+                                }
+                            }
+                        }
+                    }
+
                     var translation = _sqlTranslator.Translate(expression);
                     if (translation == null)
                     {

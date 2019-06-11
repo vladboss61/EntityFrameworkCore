@@ -169,24 +169,20 @@ namespace Microsoft.EntityFrameworkCore.Relational.Query.Pipeline
                 return BindProperty(source, propertyName);
             }
 
-            if (methodCallExpression.Method.DeclaringType == typeof(Queryable))
+            var subqueryTranslation = _queryableMethodTranslatingExpressionVisitor.TranslateSubquery(methodCallExpression);
+            if (subqueryTranslation != null
+                && subqueryTranslation.ResultType != ResultType.Enumerable)
             {
-                var translation = _queryableMethodTranslatingExpressionVisitor.TranslateSubquery(methodCallExpression);
-
-                var subquery = (SelectExpression)translation.QueryExpression;
+                var subquery = (SelectExpression)subqueryTranslation.QueryExpression;
                 subquery.ApplyProjection();
 
+                Debug.Assert(subquery.Projection.Count == 1, "Only scalar subquery can be lifted in SQL.");
                 if (methodCallExpression.Method.Name == nameof(Queryable.Any)
                     || methodCallExpression.Method.Name == nameof(Queryable.All)
                     || methodCallExpression.Method.Name == nameof(Queryable.Contains))
                 {
-                    if (subquery.Tables.Count == 0
-                        && subquery.Projection.Count == 1)
-                    {
-                        return subquery.Projection[0].Expression;
-                    }
-
-                    throw new InvalidOperationException();
+                    Debug.Assert(subquery.Tables.Count == 0, "Bool returning queryable method should only have projection.");
+                    return subquery.Projection[0].Expression;
                 }
 
                 return new SubSelectExpression(subquery);

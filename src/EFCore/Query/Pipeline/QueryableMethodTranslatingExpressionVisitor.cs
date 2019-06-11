@@ -14,6 +14,13 @@ namespace Microsoft.EntityFrameworkCore.Query.Pipeline
 {
     public abstract class QueryableMethodTranslatingExpressionVisitor : ExpressionVisitor
     {
+        private readonly bool _throwOnUnknownMethod;
+
+        protected QueryableMethodTranslatingExpressionVisitor(bool throwOnUnknownMethod)
+        {
+            _throwOnUnknownMethod = throwOnUnknownMethod;
+        }
+
         protected override Expression VisitExtension(Expression extensionExpression)
         {
             if (extensionExpression is ShapedQueryExpression)
@@ -441,7 +448,10 @@ namespace Microsoft.EntityFrameworkCore.Query.Pipeline
                 return Visit(methodCallExpression.Arguments[0]);
             }
 
-            return base.VisitMethodCall(methodCallExpression);
+            return _throwOnUnknownMethod
+                ? throw new InvalidOperationException("Unknown method encountered while translating query.")
+                : (Expression)null;
+
         }
 
         protected Type CreateTransparentIdentifierType(Type outerType, Type innerType)

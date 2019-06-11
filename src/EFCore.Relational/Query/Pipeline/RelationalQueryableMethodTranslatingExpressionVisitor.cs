@@ -29,6 +29,7 @@ namespace Microsoft.EntityFrameworkCore.Relational.Query.Pipeline
             IModel model,
             IRelationalSqlTranslatingExpressionVisitorFactory relationalSqlTranslatingExpressionVisitorFactory,
             ISqlExpressionFactory sqlExpressionFactory)
+            : base(throwOnUnknownMethod: true)
         {
             _sqlTranslator = relationalSqlTranslatingExpressionVisitorFactory.Create(model, this);
 
@@ -40,7 +41,9 @@ namespace Microsoft.EntityFrameworkCore.Relational.Query.Pipeline
         private RelationalQueryableMethodTranslatingExpressionVisitor(
             IModel model,
             RelationalSqlTranslatingExpressionVisitor sqlTranslator,
-            ISqlExpressionFactory sqlExpressionFactory)
+            ISqlExpressionFactory sqlExpressionFactory,
+            bool throwOnUnknownMethod)
+            : base(throwOnUnknownMethod)
         {
             _model = model;
             _sqlTranslator = sqlTranslator;
@@ -53,8 +56,8 @@ namespace Microsoft.EntityFrameworkCore.Relational.Query.Pipeline
             return (ShapedQueryExpression)new RelationalQueryableMethodTranslatingExpressionVisitor(
                 _model,
                 _sqlTranslator,
-                _sqlExpressionFactory).Visit(expression);
-
+                _sqlExpressionFactory,
+                throwOnUnknownMethod: false).Visit(expression);
         }
 
         protected override ShapedQueryExpression TranslateAll(ShapedQueryExpression source, LambdaExpression predicate)
