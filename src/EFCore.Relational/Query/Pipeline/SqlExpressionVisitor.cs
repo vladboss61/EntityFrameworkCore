@@ -42,6 +42,9 @@ namespace Microsoft.EntityFrameworkCore.Relational.Query.Pipeline
                 case OrderingExpression orderingExpression:
                     return VisitOrdering(orderingExpression);
 
+                case OuterApplyExpression outerApplyExpression:
+                    return VisitOuterApply(outerApplyExpression);
+
                 case ProjectionExpression projectionExpression:
                     return VisitProjection(projectionExpression);
 
@@ -79,6 +82,7 @@ namespace Microsoft.EntityFrameworkCore.Relational.Query.Pipeline
         protected abstract Expression VisitExists(ExistsExpression existsExpression);
         protected abstract Expression VisitIn(InExpression inExpression);
         protected abstract Expression VisitCrossJoin(CrossJoinExpression crossJoinExpression);
+        protected abstract Expression VisitOuterApply(OuterApplyExpression outerApplyExpression);
         protected abstract Expression VisitFromSql(FromSqlExpression fromSqlExpression);
         protected abstract Expression VisitInnerJoin(InnerJoinExpression innerJoinExpression);
         protected abstract Expression VisitLeftJoin(LeftJoinExpression leftJoinExpression);

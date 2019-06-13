@@ -31,6 +31,14 @@ namespace Microsoft.EntityFrameworkCore.Query.Pipeline
             return new ProjectionMember(existingChain);
         }
 
+        public ProjectionMember AddMember(ProjectionMember projectionMember)
+        {
+            var existingChain = _memberChain.ToList();
+            existingChain.AddRange(projectionMember._memberChain);
+
+            return new ProjectionMember(existingChain);
+        }
+
         public ProjectionMember ShiftMember(MemberInfo member)
         {
             var existingChain = _memberChain.ToList();

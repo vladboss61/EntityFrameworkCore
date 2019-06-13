@@ -459,19 +459,6 @@ namespace Microsoft.EntityFrameworkCore.Query.Pipeline
             return typeof(TransparentIdentifier<,>).MakeGenericType(outerType, innerType);
         }
 
-        private class EntityShaperNullableMarkingExpressionVisitor : ExpressionVisitor
-        {
-            protected override Expression VisitExtension(Expression extensionExpression)
-            {
-                if (extensionExpression is EntityShaperExpression entityShaper)
-                {
-                    return new EntityShaperExpression(entityShaper.EntityType, entityShaper.ValueBufferExpression, true);
-                }
-
-                return base.VisitExtension(extensionExpression);
-            }
-        }
-
         protected ShapedQueryExpression TranslateResultSelectorForJoin(
             ShapedQueryExpression outer,
             LambdaExpression resultSelector,
@@ -481,7 +468,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Pipeline
         {
             if (innerNullable)
             {
-                innerShaper = new EntityShaperNullableMarkingExpressionVisitor().Visit(innerShaper);
+                innerShaper = innerShaper.MakeShaperNullable();
             }
 
             outer.ShaperExpression = CombineShapers(
@@ -523,38 +510,13 @@ namespace Microsoft.EntityFrameworkCore.Query.Pipeline
         {
             var outerMemberInfo = transparentIdentifierType.GetTypeInfo().GetDeclaredField("Outer");
             var innerMemberInfo = transparentIdentifierType.GetTypeInfo().GetDeclaredField("Inner");
-            outerShaper = new MemberAccessShiftingExpressionVisitor(queryExpression, outerMemberInfo).Visit(outerShaper);
-            innerShaper = new MemberAccessShiftingExpressionVisitor(queryExpression, innerMemberInfo).Visit(innerShaper);
+            outerShaper = outerShaper.UpdateProjectionBindings(queryExpression, new ProjectionMember().AddMember(outerMemberInfo));
+            innerShaper = innerShaper.UpdateProjectionBindings(queryExpression, new ProjectionMember().AddMember(innerMemberInfo));
 
             return Expression.New(
                 transparentIdentifierType.GetTypeInfo().DeclaredConstructors.Single(),
                 new[] { outerShaper, innerShaper },
                 new[] { outerMemberInfo, innerMemberInfo });
-        }
-
-        private class MemberAccessShiftingExpressionVisitor : ExpressionVisitor
-        {
-            private readonly Expression _queryExpression;
-            private readonly MemberInfo _memberShift;
-
-            public MemberAccessShiftingExpressionVisitor(Expression queryExpression, MemberInfo memberShift)
-            {
-                _queryExpression = queryExpression;
-                _memberShift = memberShift;
-            }
-
-            protected override Expression VisitExtension(Expression node)
-            {
-                if (node is ProjectionBindingExpression projectionBindingExpression)
-                {
-                    return new ProjectionBindingExpression(
-                        _queryExpression,
-                        projectionBindingExpression.ProjectionMember.ShiftMember(_memberShift),
-                        projectionBindingExpression.Type);
-                }
-
-                return base.VisitExtension(node);
-            }
         }
 
         private static Expression AccessOuterTransparentField(

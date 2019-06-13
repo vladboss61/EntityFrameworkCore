@@ -11,7 +11,7 @@ using System.Runtime.Versioning;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Query.Expressions.Internal;
+using Microsoft.EntityFrameworkCore.Query.Pipeline;
 using Microsoft.EntityFrameworkCore.Query.Internal;
 using Microsoft.EntityFrameworkCore.Utilities;
 
@@ -369,6 +369,49 @@ namespace Microsoft.EntityFrameworkCore.Internal
             }
 
             return result;
+        }
+
+        public static Expression MakeShaperNullable(this Expression shaperExpression)
+            => new EntityShaperNullableMarkingExpressionVisitor().Visit(shaperExpression);
+
+        private class EntityShaperNullableMarkingExpressionVisitor : ExpressionVisitor
+        {
+            protected override Expression VisitExtension(Expression extensionExpression)
+            {
+                if (extensionExpression is EntityShaperExpression entityShaper)
+                {
+                    return new EntityShaperExpression(entityShaper.EntityType, entityShaper.ValueBufferExpression, true);
+                }
+
+                return base.VisitExtension(extensionExpression);
+            }
+        }
+
+        public static Expression UpdateProjectionBindings(
+            this Expression shaperExpression, Expression queryExpression, ProjectionMember memberShift)
+            => new MemberAccessShiftingExpressionVisitor(queryExpression, memberShift).Visit(shaperExpression);
+
+        private class MemberAccessShiftingExpressionVisitor : ExpressionVisitor
+        {
+            private readonly Expression _queryExpression;
+            private readonly ProjectionMember _memberShift;
+            public MemberAccessShiftingExpressionVisitor(Expression queryExpression, ProjectionMember memberShift)
+            {
+                _queryExpression = queryExpression;
+                _memberShift = memberShift;
+            }
+            protected override Expression VisitExtension(Expression node)
+            {
+                if (node is ProjectionBindingExpression projectionBindingExpression)
+                {
+                    return new ProjectionBindingExpression(
+                        _queryExpression,
+                        _memberShift.AddMember(projectionBindingExpression.ProjectionMember),
+                        projectionBindingExpression.Type);
+                }
+
+                return base.VisitExtension(node);
+            }
         }
     }
 }

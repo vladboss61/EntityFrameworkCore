@@ -299,6 +299,16 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Query.Pipeline
             return crossJoinExpression.Update(table);
         }
 
+        protected override Expression VisitOuterApply(OuterApplyExpression outerApplyExpression)
+        {
+            var parentSearchCondition = _isSearchCondition;
+            _isSearchCondition = false;
+            var table = (TableExpressionBase)Visit(outerApplyExpression.Table);
+            _isSearchCondition = parentSearchCondition;
+
+            return outerApplyExpression.Update(table);
+        }
+
         protected override Expression VisitInnerJoin(InnerJoinExpression innerJoinExpression)
         {
             var parentSearchCondition = _isSearchCondition;

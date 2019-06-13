@@ -173,19 +173,7 @@ namespace Microsoft.EntityFrameworkCore.Relational.Query.Pipeline
             if (subqueryTranslation != null
                 && subqueryTranslation.ResultType != ResultType.Enumerable)
             {
-                var subquery = (SelectExpression)subqueryTranslation.QueryExpression;
-                subquery.ApplyProjection();
-
-                Debug.Assert(subquery.Projection.Count == 1, "Only scalar subquery can be lifted in SQL.");
-                if (methodCallExpression.Method.Name == nameof(Queryable.Any)
-                    || methodCallExpression.Method.Name == nameof(Queryable.All)
-                    || methodCallExpression.Method.Name == nameof(Queryable.Contains))
-                {
-                    Debug.Assert(subquery.Tables.Count == 0, "Bool returning queryable method should only have projection.");
-                    return subquery.Projection[0].Expression;
-                }
-
-                return new SubSelectExpression(subquery);
+                return ((SelectExpression)subqueryTranslation.QueryExpression).LiftSingleScalarProjection();
             }
 
             var @object = Visit(methodCallExpression.Object);

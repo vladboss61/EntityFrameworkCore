@@ -590,6 +590,14 @@ namespace Microsoft.EntityFrameworkCore.Relational.Query.Pipeline
             return crossJoinExpression;
         }
 
+        protected override Expression VisitOuterApply(OuterApplyExpression outerApplyExpression)
+        {
+            _relationalCommandBuilder.Append("OUTER APPLY ");
+            Visit(outerApplyExpression.Table);
+
+            return outerApplyExpression;
+        }
+
         protected override Expression VisitInnerJoin(InnerJoinExpression innerJoinExpression)
         {
             _relationalCommandBuilder.Append("INNER JOIN ");
