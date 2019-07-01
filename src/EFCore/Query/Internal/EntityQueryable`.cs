@@ -21,10 +21,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
     public class EntityQueryable<TResult>
-        : IOrderedQueryable<TResult>,
-            IAsyncEnumerable<TResult>,
-            IDetachableContext,
-            IListSource
+        : IOrderedQueryable<TResult>, IAsyncEnumerable<TResult>, IDetachableContext, IListSource
     {
         private static readonly EntityQueryable<TResult> _detached
             = new EntityQueryable<TResult>(NullAsyncQueryProvider.Instance);

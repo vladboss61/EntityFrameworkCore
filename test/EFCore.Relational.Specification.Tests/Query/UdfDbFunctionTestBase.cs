@@ -4,7 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.EntityFrameworkCore.Relational.Query.Pipeline.SqlExpressions;
+using Microsoft.EntityFrameworkCore.Relational.Query.Expressions.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Xunit;
 

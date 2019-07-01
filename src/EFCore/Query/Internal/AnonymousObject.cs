@@ -16,30 +16,6 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
     /// </summary>
     public readonly struct AnonymousObject
     {
-        ///// <summary>
-        /////     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
-        /////     the same compatibility standards as public APIs. It may be changed or removed without notice in
-        /////     any release. You should only use it directly in your code with extreme caution and knowing that
-        /////     doing so can result in application failures when updating to a new Entity Framework Core release.
-        ///// </summary>
-        //public static bool IsGetValueExpression(
-        //    [NotNull] MethodCallExpression methodCallExpression,
-        //    out QuerySourceReferenceExpression querySourceReferenceExpression)
-        //{
-        //    querySourceReferenceExpression = null;
-
-        //    if (methodCallExpression.Object?.Type == typeof(AnonymousObject)
-        //        && methodCallExpression.Method.Equals(GetValueMethodInfo)
-        //        && methodCallExpression.Object is QuerySourceReferenceExpression qsre)
-        //    {
-        //        querySourceReferenceExpression = qsre;
-
-        //        return true;
-        //    }
-
-        //    return false;
-        //}
-
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
         ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
@@ -50,16 +26,6 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
             = typeof(AnonymousObject).GetTypeInfo()
                 .DeclaredConstructors
                 .Single(c => c.GetParameters().Length == 1);
-
-        /// <summary>
-        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
-        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
-        ///     any release. You should only use it directly in your code with extreme caution and knowing that
-        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
-        /// </summary>
-        public static readonly MethodInfo GetValueMethodInfo
-            = typeof(AnonymousObject).GetTypeInfo()
-                .GetDeclaredMethod(nameof(GetValue));
 
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -116,22 +82,6 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
                 hash.Add(value);
             }
             return hash.ToHashCode();
-        }
-
-        /// <summary>
-        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
-        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
-        ///     any release. You should only use it directly in your code with extreme caution and knowing that
-        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
-        /// </summary>
-        public object GetValue(int index) => _values[index];
-
-        // this is temporary, until relinq is removed
-        internal bool OnlyNullValues(out int count)
-        {
-            count = _values.Count();
-
-            return _values.All(v => v == null);
         }
     }
 }
