@@ -23,7 +23,7 @@ namespace Microsoft.EntityFrameworkCore.Query
 
         protected TFixture Fixture { get; }
 
-        [ConditionalFact(Skip = "Issue #14935. Cannot eval 'where ([a.LeafAAddress] == [b.LeafBAddress])'")]
+        [ConditionalFact]
         public virtual void Query_with_owned_entity_equality_operator()
         {
             using (var context = CreateContext())
@@ -173,12 +173,12 @@ namespace Microsoft.EntityFrameworkCore.Query
             {
                 var query = ctx.Set<OwnedPerson>()
                     .Where(p => p.PersonAddress.Country.Name == "USA")
-                    .Select(p => p.PersonAddress.Country.Name);
+                    .Select(p => p.PersonAddress.Country);
 
                 var result = query.ToList();
 
                 Assert.Equal(4, result.Count);
-                Assert.True(result.All(r => r == "USA"));
+                //Assert.True(result.All(r => r == "USA"));
             }
         }
 

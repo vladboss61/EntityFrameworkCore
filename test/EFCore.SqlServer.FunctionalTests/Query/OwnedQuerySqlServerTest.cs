@@ -6,13 +6,12 @@ using Xunit.Abstractions;
 
 namespace Microsoft.EntityFrameworkCore.Query
 {
-    //issue #15285
-    internal class OwnedQuerySqlServerTest : RelationalOwnedQueryTestBase<OwnedQuerySqlServerTest.OwnedQuerySqlServerFixture>
+    public class OwnedQuerySqlServerTest : RelationalOwnedQueryTestBase<OwnedQuerySqlServerTest.OwnedQuerySqlServerFixture>
     {
         public OwnedQuerySqlServerTest(OwnedQuerySqlServerFixture fixture, ITestOutputHelper testOutputHelper)
             : base(fixture)
         {
-            //fixture.TestSqlLoggerFactory.SetTestOutputHelper(testOutputHelper);
+            Fixture.TestSqlLoggerFactory.SetTestOutputHelper(testOutputHelper);
         }
 
         public override void Query_with_owned_entity_equality_operator()
@@ -20,46 +19,18 @@ namespace Microsoft.EntityFrameworkCore.Query
             base.Query_with_owned_entity_equality_operator();
 
             AssertSql(
-                @"SELECT [a].[Id], [a].[Discriminator], [t].[Id], [t0].[Id], [t0].[BranchAddress_Country_Name], [t0].[BranchAddress_Country_PlanetId], [t1].[Id], [t2].[Id], [t2].[PersonAddress_Country_Name], [t2].[PersonAddress_Country_PlanetId], [t3].[Id], [t4].[Id], [t4].[LeafAAddress_Country_Name], [t4].[LeafAAddress_Country_PlanetId], [t5].[Id]
-FROM [OwnedPerson] AS [a]
-LEFT JOIN (
-    SELECT [a.BranchAddress].*
-    FROM [OwnedPerson] AS [a.BranchAddress]
-    WHERE [a.BranchAddress].[Discriminator] IN (N'LeafA', N'Branch')
-) AS [t] ON [a].[Id] = [t].[Id]
-LEFT JOIN (
-    SELECT [a.BranchAddress.Country].*
-    FROM [OwnedPerson] AS [a.BranchAddress.Country]
-    WHERE [a.BranchAddress.Country].[Discriminator] IN (N'LeafA', N'Branch')
-) AS [t0] ON [t].[Id] = [t0].[Id]
-LEFT JOIN (
-    SELECT [a.PersonAddress].*
-    FROM [OwnedPerson] AS [a.PersonAddress]
-    WHERE [a.PersonAddress].[Discriminator] IN (N'LeafB', N'LeafA', N'Branch', N'OwnedPerson')
-) AS [t1] ON [a].[Id] = [t1].[Id]
-LEFT JOIN (
-    SELECT [a.PersonAddress.Country].*
-    FROM [OwnedPerson] AS [a.PersonAddress.Country]
-    WHERE [a.PersonAddress.Country].[Discriminator] IN (N'LeafB', N'LeafA', N'Branch', N'OwnedPerson')
-) AS [t2] ON [t1].[Id] = [t2].[Id]
-LEFT JOIN (
-    SELECT [a.LeafAAddress].*
-    FROM [OwnedPerson] AS [a.LeafAAddress]
-    WHERE [a.LeafAAddress].[Discriminator] = N'LeafA'
-) AS [t3] ON [a].[Id] = [t3].[Id]
-LEFT JOIN (
-    SELECT [a.LeafAAddress.Country].*
-    FROM [OwnedPerson] AS [a.LeafAAddress.Country]
-    WHERE [a.LeafAAddress.Country].[Discriminator] = N'LeafA'
-) AS [t4] ON [t3].[Id] = [t4].[Id]
-CROSS JOIN [OwnedPerson] AS [b]
-LEFT JOIN (
-    SELECT [b.LeafBAddress].*
-    FROM [OwnedPerson] AS [b.LeafBAddress]
-    WHERE [b.LeafBAddress].[Discriminator] = N'LeafB'
-) AS [t5] ON [b].[Id] = [t5].[Id]
-WHERE [a].[Discriminator] = N'LeafA'
-ORDER BY [a].[Id]");
+                @"SELECT [t].[Id], [t].[Discriminator]
+FROM (
+    SELECT [o].[Id], [o].[Discriminator]
+    FROM [OwnedPerson] AS [o]
+    WHERE [o].[Discriminator] = N'LeafA'
+) AS [t]
+CROSS JOIN (
+    SELECT [o0].[Id], [o0].[Discriminator]
+    FROM [OwnedPerson] AS [o0]
+    WHERE [o0].[Discriminator] = N'LeafB'
+) AS [t0]
+WHERE CAST(0 AS bit) = CAST(1 AS bit)");
         }
 
         public override void Query_for_base_type_loads_all_owned_navs()
@@ -170,7 +141,7 @@ ORDER BY [t15].[Id]");
             AssertSql(
                 @"SELECT COUNT(*)
 FROM [OwnedPerson] AS [o]
-WHERE [o].[Discriminator] IN (N'LeafB', N'LeafA', N'Branch', N'OwnedPerson')");
+WHERE [o].[Discriminator] IN (N'OwnedPerson', N'Branch', N'LeafB', N'LeafA')");
         }
 
         public override void Query_for_branch_type_loads_all_owned_navs()

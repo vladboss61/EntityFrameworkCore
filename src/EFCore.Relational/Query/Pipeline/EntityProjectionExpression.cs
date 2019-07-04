@@ -7,6 +7,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using Microsoft.EntityFrameworkCore.Query.Pipeline;
 using Microsoft.EntityFrameworkCore.Relational.Query.Pipeline.SqlExpressions;
 
 namespace Microsoft.EntityFrameworkCore.Relational.Query.Pipeline
@@ -15,6 +16,8 @@ namespace Microsoft.EntityFrameworkCore.Relational.Query.Pipeline
     {
         private readonly IDictionary<IProperty, ColumnExpression> _propertyExpressionsCache
             = new Dictionary<IProperty, ColumnExpression>();
+        private readonly IDictionary<INavigation, EntityShaperExpression> _navigationExpressionsCache
+            = new Dictionary<INavigation, EntityShaperExpression>();
         private readonly TableExpressionBase _innerTable;
         private readonly bool _nullable;
 
@@ -106,6 +109,32 @@ namespace Microsoft.EntityFrameworkCore.Relational.Query.Pipeline
             }
 
             return expression;
+        }
+
+        public void AddNavigationBinding(INavigation navigation, EntityShaperExpression entityShaper)
+        {
+            if (!EntityType.GetTypesInHierarchy().Contains(navigation.DeclaringEntityType))
+            {
+                throw new InvalidOperationException(
+                    $"Called EntityProjectionExpression.AddNavigationBinding() with incorrect INavigation. " +
+                    $"EntityType:{EntityType.DisplayName()}, Property:{navigation.Name}");
+            }
+
+            _navigationExpressionsCache[navigation] = entityShaper;
+        }
+
+        public EntityShaperExpression BindNavigation(INavigation navigation)
+        {
+            if (!EntityType.GetTypesInHierarchy().Contains(navigation.DeclaringEntityType))
+            {
+                throw new InvalidOperationException(
+                    $"Called EntityProjectionExpression.BindNavigation() with incorrect INavigation. " +
+                    $"EntityType:{EntityType.DisplayName()}, Property:{navigation.Name}");
+            }
+
+            return _navigationExpressionsCache.TryGetValue(navigation, out var expression)
+                ? expression
+                : null;
         }
     }
 }

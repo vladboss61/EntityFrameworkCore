@@ -166,22 +166,27 @@ namespace Microsoft.EntityFrameworkCore.Relational.Query.Pipeline
         {
             if (extensionExpression is EntityShaperExpression entityShaperExpression)
             {
-                var projectionBindingExpression = (ProjectionBindingExpression)entityShaperExpression.ValueBufferExpression;
-                VerifySelectExpression(projectionBindingExpression);
+                EntityProjectionExpression entityProjectionExpression;
+                if (entityShaperExpression.ValueBufferExpression is ProjectionBindingExpression projectionBindingExpression)
+                {
+                    VerifySelectExpression(projectionBindingExpression);
+                    entityProjectionExpression = (EntityProjectionExpression)_selectExpression.GetMappedProjection(
+                        projectionBindingExpression.ProjectionMember);
+                }
+                else
+                {
+                    entityProjectionExpression = (EntityProjectionExpression)entityShaperExpression.ValueBufferExpression;
+                }
 
                 if (_clientEval)
                 {
-                    var entityProjection = (EntityProjectionExpression)_selectExpression.GetMappedProjection(
-                        projectionBindingExpression.ProjectionMember);
-
                     return entityShaperExpression.Update(
-                        new ProjectionBindingExpression(_selectExpression, _selectExpression.AddToProjection(entityProjection)),
+                        new ProjectionBindingExpression(_selectExpression, _selectExpression.AddToProjection(entityProjectionExpression)),
                         entityShaperExpression.NestedEntities);
                 }
                 else
                 {
-                    _projectionMapping[_projectionMembers.Peek()]
-                        = _selectExpression.GetMappedProjection(projectionBindingExpression.ProjectionMember);
+                    _projectionMapping[_projectionMembers.Peek()] = entityProjectionExpression;
 
                     return entityShaperExpression.Update(
                         new ProjectionBindingExpression(_selectExpression, _projectionMembers.Peek(), typeof(ValueBuffer)),

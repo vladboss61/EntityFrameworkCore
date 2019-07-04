@@ -14,6 +14,8 @@ using Microsoft.EntityFrameworkCore.Query.Pipeline;
 using Microsoft.EntityFrameworkCore.Relational.Query.Pipeline.SqlExpressions;
 using System.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.EntityFrameworkCore.Internal;
+using Microsoft.EntityFrameworkCore.Query.Expressions.Internal;
 
 namespace Microsoft.EntityFrameworkCore.Relational.Query.Pipeline
 {
@@ -688,6 +690,7 @@ namespace Microsoft.EntityFrameworkCore.Relational.Query.Pipeline
             }
 
             var newSelectorBody = ReplacingExpressionVisitor.Replace(selector.Parameters.Single(), source.ShaperExpression, selector.Body);
+            newSelectorBody = new WeakEntityExpandingExpressionVisitor(this).Expand(selectExpression, newSelectorBody);
             source.ShaperExpression = _projectionBindingExpressionVisitor.Translate(selectExpression, newSelectorBody);
 
             return source;
@@ -878,7 +881,146 @@ namespace Microsoft.EntityFrameworkCore.Relational.Query.Pipeline
         {
             var lambdaBody = RemapLambdaBody(shapedQueryExpression.ShaperExpression, lambdaExpression);
 
+            var selectExpression = (SelectExpression)shapedQueryExpression.QueryExpression;
+            lambdaBody = new WeakEntityExpandingExpressionVisitor(this).Expand(selectExpression, lambdaBody);
+
             return TranslateExpression(lambdaBody);
+        }
+
+        public class WeakEntityExpandingExpressionVisitor : ExpressionVisitor
+        {
+            private readonly RelationalQueryableMethodTranslatingExpressionVisitor _visitor;
+            private SelectExpression _selectExpression;
+
+            public WeakEntityExpandingExpressionVisitor(RelationalQueryableMethodTranslatingExpressionVisitor visitor)
+            {
+                _visitor = visitor;
+            }
+
+            public Expression Expand(SelectExpression selectExpression, Expression lambdaBody)
+            {
+                _selectExpression = selectExpression;
+
+                return Visit(lambdaBody);
+            }
+
+            protected override Expression VisitMember(MemberExpression memberExpression)
+            {
+                var innerExpression = Visit(memberExpression.Expression);
+
+                if (innerExpression is EntityShaperExpression
+                    || (innerExpression is UnaryExpression innerUnaryExpression
+                        && innerUnaryExpression.NodeType == ExpressionType.Convert
+                        && innerUnaryExpression.Operand is EntityShaperExpression))
+                {
+                    var collectionNavigation = Expand(innerExpression, MemberIdentity.Create(memberExpression.Member));
+                    if (collectionNavigation != null)
+                    {
+                        return collectionNavigation;
+                    }
+                }
+
+                return memberExpression.Update(innerExpression);
+            }
+
+            protected override Expression VisitExtension(Expression extensionExpression)
+            {
+                if (extensionExpression is EntityShaperExpression)
+                {
+                    return extensionExpression;
+                }
+
+                if (extensionExpression is NullConditionalExpression nullConditionalExpression)
+                {
+                    return Visit(nullConditionalExpression.AccessOperation);
+                }
+
+                return base.VisitExtension(extensionExpression);
+            }
+
+            private Expression Expand(Expression source, MemberIdentity member)
+            {
+                Type convertedType = null;
+                if (source is UnaryExpression unaryExpression
+                    && unaryExpression.NodeType == ExpressionType.Convert)
+                {
+                    source = unaryExpression.Operand;
+                    if (unaryExpression.Type != typeof(object))
+                    {
+                        convertedType = unaryExpression.Type;
+                    }
+                }
+
+                if (source is EntityShaperExpression entityShaperExpression)
+                {
+                    var entityType = entityShaperExpression.EntityType;
+                    if (convertedType != null)
+                    {
+                        entityType = entityType.RootType().GetDerivedTypesInclusive()
+                            .FirstOrDefault(et => et.ClrType == convertedType);
+
+                        if (entityType == null)
+                        {
+                            return null;
+                        }
+                    }
+
+                    var navigation = member.MemberInfo != null
+                        ? entityType.FindNavigation(member.MemberInfo)
+                        : entityType.FindNavigation(member.Name);
+
+                    if (navigation != null)
+                    {
+                        if (navigation.IsCollection())
+                        {
+                            return _visitor.CreateShapedQueryExpression(
+                                navigation.GetTargetType(),
+                                _visitor._sqlExpressionFactory.Select(navigation.GetTargetType()));
+                        }
+
+                        var entityProjectionExpression = (EntityProjectionExpression)
+                            (entityShaperExpression.ValueBufferExpression is ProjectionBindingExpression projectionBindingExpression
+                                ? _selectExpression.GetMappedProjection(projectionBindingExpression.ProjectionMember)
+                                : entityShaperExpression.ValueBufferExpression);
+
+                        var innerShaper = entityProjectionExpression.BindNavigation(navigation);
+                        if (innerShaper == null)
+                        {
+                            var targetEntityType = navigation.GetTargetType();
+                            var innerSelectExpression = _visitor._sqlExpressionFactory.Select(targetEntityType);
+                            var innerShapedQuery = _visitor.CreateShapedQueryExpression(targetEntityType, innerSelectExpression);
+
+                            var outerKey = CreateKeyAccessExpression(entityShaperExpression, navigation.ForeignKey.PrincipalKey.Properties);
+                            var innerKey = CreateKeyAccessExpression(innerShapedQuery.ShaperExpression, navigation.ForeignKey.Properties);
+
+                            var joinPredicate = _visitor.TranslateExpression(Expression.Equal(outerKey, innerKey));
+                            _selectExpression.AddLeftJoin(innerSelectExpression, joinPredicate, null);
+                            var leftJoinTable = ((LeftJoinExpression)_selectExpression.Tables.Last()).Table;
+                            innerShaper = new EntityShaperExpression(targetEntityType,
+                                new EntityProjectionExpression(targetEntityType, leftJoinTable, true),
+                                true);
+                            entityProjectionExpression.AddNavigationBinding(navigation, innerShaper);
+                        }
+
+                        return innerShaper;
+                    }
+                }
+
+                return null;
+            }
+
+            public static Expression CreateKeyAccessExpression(
+                Expression target, IReadOnlyList<IProperty> properties)
+                => properties.Count == 1
+                    ? target.CreateEFPropertyExpression(properties[0], makeNullable: false)
+                    : Expression.New(
+                        AnonymousObject.AnonymousObjectCtor,
+                        Expression.NewArrayInit(
+                            typeof(object),
+                            properties
+                                .Select(p => Expression.Convert(target.CreateEFPropertyExpression(p, makeNullable: false), typeof(object)))
+                                .Cast<Expression>()
+                                .ToArray()));
         }
 
         private Expression RemapLambdaBody(Expression shaperBody, LambdaExpression lambdaExpression)

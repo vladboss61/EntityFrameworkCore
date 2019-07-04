@@ -2407,7 +2407,7 @@ WHERE [e].[Id] IN (
 
         #region Bug9202/9210
 
-        [ConditionalFact(Skip = "issue #15285")]
+        [ConditionalFact]
         public void Include_collection_for_entity_with_owned_type_works()
         {
             using (CreateDatabase9202())
@@ -2453,7 +2453,7 @@ ORDER BY [t2].[Id]");
             }
         }
 
-        [ConditionalFact(Skip = "issue #15285")]
+        [ConditionalFact]
         public void Include_collection_for_entity_with_owned_type_works_string()
         {
             using (CreateDatabase9202())
@@ -3468,7 +3468,7 @@ ORDER BY [t].[Id]");
 
         #region Bug10168
 
-        [ConditionalFact(Skip = "issue #15285")]
+        [ConditionalFact(Skip = "issue #16400")]
         public void Row_number_paging_with_owned_type()
         {
             using (var context = new MyContext10168(Fixture.TestSqlLoggerFactory))
