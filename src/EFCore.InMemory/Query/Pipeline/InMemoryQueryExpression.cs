@@ -66,6 +66,9 @@ namespace Microsoft.EntityFrameworkCore.InMemory.Query.Pipeline
         public static ParameterExpression ValueBufferParameter = Parameter(typeof(ValueBuffer), "valueBuffer");
         private static readonly ConstructorInfo _valueBufferConstructor = typeof(ValueBuffer).GetConstructors().Single(ci => ci.GetParameters().Length == 1);
 
+        private readonly IDictionary<EntityProjectionExpression, IDictionary<IProperty, int>> _entityProjectionCache
+            = new Dictionary<EntityProjectionExpression, IDictionary<IProperty, int>>();
+
         private List<Expression> _valueBufferSlots = new List<Expression>();
         private IDictionary<ProjectionMember, Expression> _projectionMapping = new Dictionary<ProjectionMember, Expression>();
 
@@ -142,6 +145,27 @@ namespace Microsoft.EntityFrameworkCore.InMemory.Query.Pipeline
             var index = (int)((ConstantExpression)readValueExpression.Arguments[1]).Value;
 
             return _valueBufferSlots[index];
+        }
+
+        public IDictionary<IProperty, int> AddToProjection(EntityProjectionExpression entityProjection)
+        {
+            if (!_entityProjectionCache.TryGetValue(entityProjection, out var dictionary))
+            {
+                dictionary = new Dictionary<IProperty, int>();
+                foreach (var property in GetAllPropertiesInHierarchy(entityProjection.EntityType))
+                {
+                    dictionary[property] = property.GetIndex();
+                }
+
+                _entityProjectionCache[entityProjection] = dictionary;
+            }
+
+            return dictionary;
+        }
+
+        private IEnumerable<IProperty> GetAllPropertiesInHierarchy(IEntityType entityType)
+        {
+            return entityType.GetTypesInHierarchy().SelectMany(e => e.GetDeclaredProperties());
         }
 
         public LambdaExpression GetScalarProjectionLambda()
@@ -224,11 +248,12 @@ namespace Microsoft.EntityFrameworkCore.InMemory.Query.Pipeline
                 Constant(index),
                 Constant(property, typeof(IPropertyBase)));
 
-        public void AddInnerJoin(
+        public void AddJoin(
             InMemoryQueryExpression queryExpression,
             LambdaExpression outerKeySelector,
             LambdaExpression innerKeySelector,
-            Type transparentIdentifierType)
+            Type transparentIdentifierType,
+            bool useLeftJoin)
         {
             var outerParameter = Parameter(typeof(ValueBuffer), "outer");
             var innerParameter = Parameter(typeof(ValueBuffer), "inner");

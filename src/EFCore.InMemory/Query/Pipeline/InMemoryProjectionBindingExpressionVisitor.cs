@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore.Internal;
+using Microsoft.EntityFrameworkCore.Query.NavigationExpansion;
 using Microsoft.EntityFrameworkCore.Query.Pipeline;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -14,6 +15,8 @@ namespace Microsoft.EntityFrameworkCore.InMemory.Query.Pipeline
     public class InMemoryProjectionBindingExpressionVisitor : ExpressionVisitor
     {
         private InMemoryQueryExpression _queryExpression;
+        private bool _clientEval;
+
         private readonly IDictionary<ProjectionMember, Expression> _projectionMapping
             = new Dictionary<ProjectionMember, Expression>();
 
@@ -29,10 +32,20 @@ namespace Microsoft.EntityFrameworkCore.InMemory.Query.Pipeline
         public Expression Translate(InMemoryQueryExpression queryExpression, Expression expression)
         {
             _queryExpression = queryExpression;
+            _clientEval = false;
 
             _projectionMembers.Push(new ProjectionMember());
 
             var result = Visit(expression);
+
+            if (result == null)
+            {
+                _clientEval = true;
+
+                result = Visit(expression);
+
+                _projectionMapping.Clear();
+            }
 
             _queryExpression.ReplaceProjectionMapping(_projectionMapping);
 
@@ -52,8 +65,17 @@ namespace Microsoft.EntityFrameworkCore.InMemory.Query.Pipeline
 
             if (!(expression is NewExpression
                   || expression is MemberInitExpression
-                  || expression is EntityShaperExpression))
+                  || expression is EntityShaperExpression
+                  || expression is IncludeExpression))
             {
+                // if (_clientEval)
+                // {
+                //     if (expression is ConstantExpression)
+                //     {
+                //         return expression;
+                //     }
+                // }
+
                 // TODO: Remove when InMemory implements client eval projection
                 // This converts object[] from GetDatabaseValues to appropriate projection.
                 if (expression is NewArrayExpression newArrayExpression
@@ -71,7 +93,7 @@ namespace Microsoft.EntityFrameworkCore.InMemory.Query.Pipeline
                     VerifyQueryExpression(projectionBindingExpression);
 
                     _projectionMapping[_projectionMembers.Peek()]
-                       = _queryExpression.GetMappedProjection(projectionBindingExpression.ProjectionMember);
+                        = _queryExpression.GetMappedProjection(projectionBindingExpression.ProjectionMember);
 
                     return new EntityValuesExpression(entityShaperExpression.EntityType, projectionBindingExpression);
                 }
@@ -93,12 +115,27 @@ namespace Microsoft.EntityFrameworkCore.InMemory.Query.Pipeline
                 var projectionBindingExpression = (ProjectionBindingExpression)entityShaperExpression.ValueBufferExpression;
                 VerifyQueryExpression(projectionBindingExpression);
 
+                if (_clientEval)
+                {
+                    var entityProjection = (EntityProjectionExpression)_queryExpression.GetMappedProjection(
+                        projectionBindingExpression.ProjectionMember);
+
+                    return entityShaperExpression.Update(
+                        new ProjectionBindingExpression(_queryExpression, _queryExpression.AddToProjection(entityProjection)),
+                        entityShaperExpression.NestedEntities);
+                }
+
                 _projectionMapping[_projectionMembers.Peek()]
                     = _queryExpression.GetMappedProjection(projectionBindingExpression.ProjectionMember);
 
                 return entityShaperExpression.Update(
                     new ProjectionBindingExpression(_queryExpression, _projectionMembers.Peek(), typeof(ValueBuffer)),
                     entityShaperExpression.NestedEntities);
+            }
+
+            if (extensionExpression is IncludeExpression includeExpression)
+            {
+                return _clientEval ? base.VisitExtension(includeExpression) : null;
             }
 
             throw new InvalidOperationException();

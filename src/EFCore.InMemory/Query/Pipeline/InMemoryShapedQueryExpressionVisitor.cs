@@ -4,17 +4,21 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.InMemory.Query.Internal;
 using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Query.Internal;
+using Microsoft.EntityFrameworkCore.Query.NavigationExpansion;
 using Microsoft.EntityFrameworkCore.Query.Pipeline;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -22,6 +26,147 @@ namespace Microsoft.EntityFrameworkCore.InMemory.Query.Pipeline
 {
     public class InMemoryShapedQueryCompilingExpressionVisitor : ShapedQueryCompilingExpressionVisitor
     {
+        private class CustomShaperCompilingExpressionVisitor : ExpressionVisitor
+        {
+            private readonly bool _tracking;
+
+            public CustomShaperCompilingExpressionVisitor(bool tracking)
+            {
+                _tracking = tracking;
+            }
+
+            private static readonly MethodInfo _includeReferenceMethodInfo
+                = typeof(CustomShaperCompilingExpressionVisitor).GetTypeInfo()
+                    .GetDeclaredMethod(nameof(IncludeReference));
+
+            private static void IncludeReference<TEntity, TIncludingEntity, TIncludedEntity>(
+                QueryContext queryContext,
+                TEntity entity,
+                TIncludedEntity relatedEntity,
+                INavigation navigation,
+                INavigation inverseNavigation,
+                Action<TIncludingEntity, TIncludedEntity> fixup,
+                bool trackingQuery)
+                where TIncludingEntity : TEntity
+            {
+                if (entity is TIncludingEntity includingEntity)
+                {
+                    if (trackingQuery)
+                    {
+                        // For non-null relatedEntity StateManager will set the flag
+                        if (relatedEntity == null)
+                        {
+                            queryContext.StateManager.TryGetEntry(includingEntity).SetIsLoaded(navigation);
+                        }
+                    }
+                    else
+                    {
+                        SetIsLoadedNoTracking(includingEntity, navigation);
+                        if (relatedEntity is object)
+                        {
+                            fixup(includingEntity, relatedEntity);
+                            if (inverseNavigation != null && !inverseNavigation.IsCollection())
+                            {
+                                SetIsLoadedNoTracking(relatedEntity, inverseNavigation);
+                            }
+                        }
+                    }
+                }
+            }
+
+            private static void SetIsLoadedNoTracking(object entity, INavigation navigation)
+            => ((ILazyLoader)((PropertyBase)navigation
+                        .DeclaringEntityType
+                        .GetServiceProperties()
+                        .FirstOrDefault(p => p.ClrType == typeof(ILazyLoader)))
+                    ?.Getter.GetClrValue(entity))
+                ?.SetLoaded(entity, navigation.Name);
+
+            protected override Expression VisitExtension(Expression extensionExpression)
+            {
+                if (extensionExpression is IncludeExpression includeExpression)
+                {
+                    Debug.Assert(!includeExpression.Navigation.IsCollection(),
+                        "Only reference include should be present in tree");
+                    var entityClrType = includeExpression.EntityExpression.Type;
+                    var includingClrType = includeExpression.Navigation.DeclaringEntityType.ClrType;
+                    var inverseNavigation = includeExpression.Navigation.FindInverse();
+                    var relatedEntityClrType = includeExpression.Navigation.GetTargetType().ClrType;
+                    if (includingClrType != entityClrType
+                        && includingClrType.IsAssignableFrom(entityClrType))
+                    {
+                        includingClrType = entityClrType;
+                    }
+
+                    return Expression.Call(
+                        _includeReferenceMethodInfo.MakeGenericMethod(entityClrType, includingClrType, relatedEntityClrType),
+                        QueryCompilationContext.QueryContextParameter,
+                        // We don't need to visit entityExpression since it is supposed to be a parameterExpression only
+                        includeExpression.EntityExpression,
+                        includeExpression.NavigationExpression,
+                        Expression.Constant(includeExpression.Navigation),
+                        Expression.Constant(inverseNavigation, typeof(INavigation)),
+                        Expression.Constant(
+                            GenerateFixup(includingClrType, relatedEntityClrType, includeExpression.Navigation, inverseNavigation).Compile()),
+                        Expression.Constant(_tracking));
+                }
+
+                return base.VisitExtension(extensionExpression);
+            }
+
+            private static LambdaExpression GenerateFixup(
+                Type entityType,
+                Type relatedEntityType,
+                INavigation navigation,
+                INavigation inverseNavigation)
+            {
+                var entityParameter = Expression.Parameter(entityType);
+                var relatedEntityParameter = Expression.Parameter(relatedEntityType);
+                var expressions = new List<Expression>
+                {
+                    navigation.IsCollection()
+                        ? AddToCollectionNavigation(entityParameter, relatedEntityParameter, navigation)
+                        : AssignReferenceNavigation(entityParameter, relatedEntityParameter, navigation)
+                };
+
+                if (inverseNavigation != null)
+                {
+                    expressions.Add(
+                        inverseNavigation.IsCollection()
+                            ? AddToCollectionNavigation(relatedEntityParameter, entityParameter, inverseNavigation)
+                            : AssignReferenceNavigation(relatedEntityParameter, entityParameter, inverseNavigation));
+
+                }
+
+                return Expression.Lambda(Expression.Block(typeof(void), expressions), entityParameter, relatedEntityParameter);
+            }
+
+            private static Expression AssignReferenceNavigation(
+                ParameterExpression entity,
+                ParameterExpression relatedEntity,
+                INavigation navigation)
+            {
+                return entity.MakeMemberAccess(navigation.GetMemberInfo(forConstruction: false, forSet: true))
+                    .CreateAssignExpression(relatedEntity);
+            }
+
+            private static Expression AddToCollectionNavigation(
+                ParameterExpression entity,
+                ParameterExpression relatedEntity,
+                INavigation navigation)
+            {
+                return Expression.Call(
+                    Expression.Constant(navigation.GetCollectionAccessor()),
+                    _collectionAccessorAddMethodInfo,
+                    entity,
+                    relatedEntity);
+            }
+
+            private static readonly MethodInfo _collectionAccessorAddMethodInfo
+                = typeof(IClrCollectionAccessor).GetTypeInfo()
+                    .GetDeclaredMethod(nameof(IClrCollectionAccessor.Add));
+        }
+
         private readonly Type _contextType;
         private readonly IDiagnosticsLogger<DbLoggerCategory.Query> _logger;
 
@@ -53,7 +198,6 @@ namespace Microsoft.EntityFrameworkCore.InMemory.Query.Pipeline
             return base.VisitExtension(extensionExpression);
         }
 
-
         protected override Expression VisitShapedQueryExpression(ShapedQueryExpression shapedQueryExpression)
         {
             var shaperBody = InjectEntityMaterializer(shapedQueryExpression.ShaperExpression);
@@ -61,8 +205,10 @@ namespace Microsoft.EntityFrameworkCore.InMemory.Query.Pipeline
             var innerEnumerable = Visit(shapedQueryExpression.QueryExpression);
 
             var newBody = new InMemoryProjectionBindingRemovingExpressionVisitor(
-                (InMemoryQueryExpression)shapedQueryExpression.QueryExpression)
+                    (InMemoryQueryExpression)shapedQueryExpression.QueryExpression)
                 .Visit(shaperBody);
+
+            newBody = new CustomShaperCompilingExpressionVisitor(TrackQueryResults).Visit(newBody);
 
             var shaperLambda = Expression.Lambda(
                 newBody,
@@ -265,6 +411,7 @@ namespace Microsoft.EntityFrameworkCore.InMemory.Query.Pipeline
         private class InMemoryProjectionBindingRemovingExpressionVisitor : ExpressionVisitor
         {
             private readonly InMemoryQueryExpression _queryExpression;
+
             private readonly IDictionary<ParameterExpression, int> _materializationContextBindings
                 = new Dictionary<ParameterExpression, int>();
 
@@ -286,7 +433,8 @@ namespace Microsoft.EntityFrameworkCore.InMemory.Query.Pipeline
                     var entityStartIndex = ((EntityProjectionExpression)innerExpression).StartIndex;
                     _materializationContextBindings[parameterExpression] = entityStartIndex;
 
-                    var updatedExpression = Expression.New(newExpression.Constructor,
+                    var updatedExpression = Expression.New(
+                        newExpression.Constructor,
                         Expression.Constant(ValueBuffer.Empty),
                         newExpression.Arguments[1]);
 
@@ -303,8 +451,10 @@ namespace Microsoft.EntityFrameworkCore.InMemory.Query.Pipeline
                 {
                     var originalIndex = (int)((ConstantExpression)methodCallExpression.Arguments[1]).Value;
                     var indexOffset = methodCallExpression.Arguments[0] is ProjectionBindingExpression projectionBindingExpression
-                        ? ((EntityProjectionExpression)_queryExpression.GetMappedProjection(projectionBindingExpression.ProjectionMember)).StartIndex
-                        : _materializationContextBindings[(ParameterExpression)((MethodCallExpression)methodCallExpression.Arguments[0]).Object];
+                        ? ((EntityProjectionExpression)_queryExpression
+                            .GetMappedProjection(projectionBindingExpression.ProjectionMember)).StartIndex
+                        : _materializationContextBindings[
+                            (ParameterExpression)((MethodCallExpression)methodCallExpression.Arguments[0]).Object];
 
                     return Expression.Call(
                         methodCallExpression.Method,

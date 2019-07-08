@@ -5,7 +5,7 @@ using Xunit.Abstractions;
 
 namespace Microsoft.EntityFrameworkCore.Query
 {
-    internal class IncludeInMemoryTest : IncludeTestBase<IncludeInMemoryFixture>
+    public class IncludeInMemoryTest : IncludeTestBase<IncludeInMemoryFixture>
     {
         public IncludeInMemoryTest(IncludeInMemoryFixture fixture, ITestOutputHelper testOutputHelper)
             : base(fixture)

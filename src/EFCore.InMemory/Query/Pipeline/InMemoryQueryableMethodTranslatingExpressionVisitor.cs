@@ -177,28 +177,13 @@ namespace Microsoft.EntityFrameworkCore.InMemory.Query.Pipeline
 
         protected override ShapedQueryExpression TranslateIntersect(ShapedQueryExpression source1, ShapedQueryExpression source2) => throw new NotImplementedException();
 
-        protected override ShapedQueryExpression TranslateJoin(ShapedQueryExpression outer, ShapedQueryExpression inner, LambdaExpression outerKeySelector, LambdaExpression innerKeySelector, LambdaExpression resultSelector)
-        {
-            outerKeySelector = TranslateLambdaExpression(outer, outerKeySelector);
-            innerKeySelector = TranslateLambdaExpression(inner, innerKeySelector);
-
-            var transparentIdentifierType = CreateTransparentIdentifierType(
-                resultSelector.Parameters[0].Type,
-                resultSelector.Parameters[1].Type);
-
-            ((InMemoryQueryExpression)outer.QueryExpression).AddInnerJoin(
-                (InMemoryQueryExpression)inner.QueryExpression,
-                outerKeySelector,
-                innerKeySelector,
-                transparentIdentifierType);
-
-            return TranslateResultSelectorForJoin(
-                outer,
-                resultSelector,
-                inner.ShaperExpression,
-                transparentIdentifierType,
-                false);
-        }
+        protected override ShapedQueryExpression TranslateJoin(
+            ShapedQueryExpression outer,
+            ShapedQueryExpression inner,
+            LambdaExpression outerKeySelector,
+            LambdaExpression innerKeySelector,
+            LambdaExpression resultSelector)
+            => TranslateJoin(outer, inner, outerKeySelector, innerKeySelector, resultSelector, useLeftJoin: false);
 
         protected override ShapedQueryExpression TranslateLastOrDefault(ShapedQueryExpression source, LambdaExpression predicate, Type returnType, bool returnDefault)
         {
@@ -211,9 +196,42 @@ namespace Microsoft.EntityFrameworkCore.InMemory.Query.Pipeline
                     : InMemoryLinqOperatorProvider.LastPredicate);
         }
 
-        protected override ShapedQueryExpression TranslateLeftJoin(ShapedQueryExpression outer, ShapedQueryExpression inner, LambdaExpression outerKeySelector, LambdaExpression innerKeySelector, LambdaExpression resultSelector)
+        protected override ShapedQueryExpression TranslateLeftJoin(
+            ShapedQueryExpression outer,
+            ShapedQueryExpression inner,
+            LambdaExpression outerKeySelector,
+            LambdaExpression innerKeySelector,
+            LambdaExpression resultSelector)
+            => TranslateJoin(outer, inner, outerKeySelector, innerKeySelector, resultSelector, useLeftJoin: true);
+
+        private ShapedQueryExpression TranslateJoin(
+            ShapedQueryExpression outer,
+            ShapedQueryExpression inner,
+            LambdaExpression outerKeySelector,
+            LambdaExpression innerKeySelector,
+            LambdaExpression resultSelector,
+            bool useLeftJoin)
         {
-            throw new NotImplementedException();
+            outerKeySelector = TranslateLambdaExpression(outer, outerKeySelector);
+            innerKeySelector = TranslateLambdaExpression(inner, innerKeySelector);
+
+            var transparentIdentifierType = CreateTransparentIdentifierType(
+                resultSelector.Parameters[0].Type,
+                resultSelector.Parameters[1].Type);
+
+            ((InMemoryQueryExpression)outer.QueryExpression).AddJoin(
+                (InMemoryQueryExpression)inner.QueryExpression,
+                outerKeySelector,
+                innerKeySelector,
+                transparentIdentifierType,
+                useLeftJoin);
+
+            return TranslateResultSelectorForJoin(
+                outer,
+                resultSelector,
+                inner.ShaperExpression,
+                transparentIdentifierType,
+                useLeftJoin);
         }
 
         protected override ShapedQueryExpression TranslateLongCount(ShapedQueryExpression source, LambdaExpression predicate)

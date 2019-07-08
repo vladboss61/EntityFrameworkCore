@@ -178,15 +178,13 @@ namespace Microsoft.EntityFrameworkCore.Relational.Query.Pipeline
                         new ProjectionBindingExpression(_selectExpression, _selectExpression.AddToProjection(entityProjection)),
                         entityShaperExpression.NestedEntities);
                 }
-                else
-                {
-                    _projectionMapping[_projectionMembers.Peek()]
-                        = _selectExpression.GetMappedProjection(projectionBindingExpression.ProjectionMember);
 
-                    return entityShaperExpression.Update(
-                        new ProjectionBindingExpression(_selectExpression, _projectionMembers.Peek(), typeof(ValueBuffer)),
-                        entityShaperExpression.NestedEntities);
-                }
+                _projectionMapping[_projectionMembers.Peek()]
+                    = _selectExpression.GetMappedProjection(projectionBindingExpression.ProjectionMember);
+
+                return entityShaperExpression.Update(
+                    new ProjectionBindingExpression(_selectExpression, _projectionMembers.Peek(), typeof(ValueBuffer)),
+                    entityShaperExpression.NestedEntities);
             }
 
             if (extensionExpression is IncludeExpression includeExpression)
