@@ -1,12 +1,13 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Xunit.Abstractions;
 
 namespace Microsoft.EntityFrameworkCore.Query
 {
-    internal class CompiledQuerySqlServerTest : CompiledQueryTestBase<NorthwindQuerySqlServerFixture<NoopModelCustomizer>>
+    public class CompiledQuerySqlServerTest : CompiledQueryTestBase<NorthwindQuerySqlServerFixture<NoopModelCustomizer>>
     {
         public CompiledQuerySqlServerTest(NorthwindQuerySqlServerFixture<NoopModelCustomizer> fixture, ITestOutputHelper testOutputHelper)
             : base(fixture)
@@ -15,21 +16,18 @@ namespace Microsoft.EntityFrameworkCore.Query
             //fixture.TestSqlLoggerFactory.SetTestOutputHelper(testOutputHelper);
         }
 
-        public override void DbSet_query()
+        public override async Task DbSet_query(bool isAsync)
         {
-            base.DbSet_query();
+            await base.DbSet_query(isAsync);
 
             AssertSql(
-                @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
-FROM [Customers] AS [c]",
-                //
                 @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
 FROM [Customers] AS [c]");
         }
 
-        public override void DbSet_query_first()
+        public override async Task DbSet_query_first(bool isAsync)
         {
-            base.DbSet_query_first();
+            await base.DbSet_query_first(isAsync);
 
             AssertSql(
                 @"SELECT TOP(1) [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
@@ -37,159 +35,137 @@ FROM [Customers] AS [c]
 ORDER BY [c].[CustomerID]");
         }
 
-        public override void Query_ending_with_include()
+        public override async Task Query_ending_with_include(bool isAsync)
         {
-            base.Query_ending_with_include();
+            await base.Query_ending_with_include(isAsync);
 
             AssertSql(
-                @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
+                @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region], [o].[OrderID], [o].[CustomerID], [o].[EmployeeID], [o].[OrderDate]
 FROM [Customers] AS [c]
-ORDER BY [c].[CustomerID]",
-                //
-                @"SELECT [c.Orders].[OrderID], [c.Orders].[CustomerID], [c.Orders].[EmployeeID], [c.Orders].[OrderDate]
-FROM [Orders] AS [c.Orders]
-INNER JOIN (
-    SELECT [c0].[CustomerID]
-    FROM [Customers] AS [c0]
-) AS [t] ON [c.Orders].[CustomerID] = [t].[CustomerID]
-ORDER BY [t].[CustomerID]",
-                //
-                @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
-FROM [Customers] AS [c]
-ORDER BY [c].[CustomerID]",
-                //
-                @"SELECT [c.Orders].[OrderID], [c.Orders].[CustomerID], [c.Orders].[EmployeeID], [c.Orders].[OrderDate]
-FROM [Orders] AS [c.Orders]
-INNER JOIN (
-    SELECT [c0].[CustomerID]
-    FROM [Customers] AS [c0]
-) AS [t] ON [c.Orders].[CustomerID] = [t].[CustomerID]
-ORDER BY [t].[CustomerID]");
+LEFT JOIN [Orders] AS [o] ON [c].[CustomerID] = [o].[CustomerID]
+ORDER BY [c].[CustomerID], [o].[OrderID]");
         }
 
-        public override void Untyped_context()
+        public override async Task Untyped_context(bool isAsync)
         {
-            base.Untyped_context();
+            await base.Untyped_context(isAsync);
 
             AssertSql(
-                @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
-FROM [Customers] AS [c]",
-                //
                 @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
 FROM [Customers] AS [c]");
         }
 
-        public override void Query_with_single_parameter()
-        {
-            base.Query_with_single_parameter();
+        //        public override async Task Query_with_single_parameter(bool isAsync)
+        //        {
+        //            await base.Query_with_single_parameter(isAsync);
 
-            AssertSql(
-                @"@__customerID='ALFKI' (Size = 5)
+        //            AssertSql(
+        //                @"@__customerID='ALFKI' (Size = 5)
 
-SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
-FROM [Customers] AS [c]
-WHERE [c].[CustomerID] = @__customerID",
-                //
-                @"@__customerID='ANATR' (Size = 5)
+        //SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
+        //FROM [Customers] AS [c]
+        //WHERE [c].[CustomerID] = @__customerID",
+        //                //
+        //                @"@__customerID='ANATR' (Size = 5)
 
-SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
-FROM [Customers] AS [c]
-WHERE [c].[CustomerID] = @__customerID");
-        }
+        //SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
+        //FROM [Customers] AS [c]
+        //WHERE [c].[CustomerID] = @__customerID");
+        //        }
 
-        public override void First_query_with_single_parameter()
-        {
-            base.First_query_with_single_parameter();
+        //        public override async Task First_query_with_single_parameter(bool isAsync)
+        //        {
+        //            await base.First_query_with_single_parameter(isAsync);
 
-            AssertSql(
-                @"@__customerID='ALFKI' (Size = 5)
+        //            AssertSql(
+        //                @"@__customerID='ALFKI' (Size = 5)
 
-SELECT TOP(1) [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
-FROM [Customers] AS [c]
-WHERE [c].[CustomerID] = @__customerID",
-                //
-                @"@__customerID='ANATR' (Size = 5)
+        //SELECT TOP(1) [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
+        //FROM [Customers] AS [c]
+        //WHERE [c].[CustomerID] = @__customerID",
+        //                //
+        //                @"@__customerID='ANATR' (Size = 5)
 
-SELECT TOP(1) [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
-FROM [Customers] AS [c]
-WHERE [c].[CustomerID] = @__customerID");
-        }
+        //SELECT TOP(1) [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
+        //FROM [Customers] AS [c]
+        //WHERE [c].[CustomerID] = @__customerID");
+        //        }
 
-        public override void Query_with_two_parameters()
-        {
-            base.Query_with_two_parameters();
+        //        public override async Task Query_with_two_parameters(bool isAsync)
+        //        {
+        //            await base.Query_with_two_parameters(isAsync);
 
-            AssertSql(
-                @"@__customerID='ALFKI' (Size = 5)
+        //            AssertSql(
+        //                @"@__customerID='ALFKI' (Size = 5)
 
-SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
-FROM [Customers] AS [c]
-WHERE [c].[CustomerID] = @__customerID",
-                //
-                @"@__customerID='ANATR' (Size = 5)
+        //SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
+        //FROM [Customers] AS [c]
+        //WHERE [c].[CustomerID] = @__customerID",
+        //                //
+        //                @"@__customerID='ANATR' (Size = 5)
 
-SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
-FROM [Customers] AS [c]
-WHERE [c].[CustomerID] = @__customerID");
-        }
+        //SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
+        //FROM [Customers] AS [c]
+        //WHERE [c].[CustomerID] = @__customerID");
+        //        }
 
-        public override void Query_with_three_parameters()
-        {
-            base.Query_with_three_parameters();
+        //        public override async Task Query_with_three_parameters(bool isAsync)
+        //        {
+        //            await base.Query_with_three_parameters(isAsync);
 
-            AssertSql(
-                @"@__customerID='ALFKI' (Size = 5)
+        //            AssertSql(
+        //                @"@__customerID='ALFKI' (Size = 5)
 
-SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
-FROM [Customers] AS [c]
-WHERE [c].[CustomerID] = @__customerID",
-                //
-                @"@__customerID='ANATR' (Size = 5)
+        //SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
+        //FROM [Customers] AS [c]
+        //WHERE [c].[CustomerID] = @__customerID",
+        //                //
+        //                @"@__customerID='ANATR' (Size = 5)
 
-SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
-FROM [Customers] AS [c]
-WHERE [c].[CustomerID] = @__customerID");
-        }
+        //SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
+        //FROM [Customers] AS [c]
+        //WHERE [c].[CustomerID] = @__customerID");
+        //        }
 
-        public override void Query_with_array_parameter()
-        {
-            base.Query_with_array_parameter();
+        //        public override async Task Query_with_array_parameter(bool isAsync)
+        //        {
+        //            await base.Query_with_array_parameter(isAsync);
 
-            AssertSql(
-                @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
-FROM [Customers] AS [c]",
-                //
-                @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
-FROM [Customers] AS [c]");
-        }
+        //            AssertSql(
+        //                @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
+        //FROM [Customers] AS [c]",
+        //                //
+        //                @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
+        //FROM [Customers] AS [c]");
+        //        }
 
-        public override void Query_with_contains()
-        {
-            base.Query_with_contains();
+        //        public override async Task Query_with_contains(bool isAsync)
+        //        {
+        //            await base.Query_with_contains(isAsync);
 
-            AssertSql(
-                @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
-FROM [Customers] AS [c]
-WHERE [c].[CustomerID] IN (N'ALFKI')",
-                //
-                @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
-FROM [Customers] AS [c]
-WHERE [c].[CustomerID] IN (N'ANATR')");
-        }
+        //            AssertSql(
+        //                @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
+        //FROM [Customers] AS [c]
+        //WHERE [c].[CustomerID] IN (N'ALFKI')",
+        //                //
+        //                @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
+        //FROM [Customers] AS [c]
+        //WHERE [c].[CustomerID] IN (N'ANATR')");
+        //        }
 
-        public override void Query_with_closure()
-        {
-            base.Query_with_closure();
+        //        public override async Task Query_with_closure(bool isAsync)
+        //        {
+        //            await base.Query_with_closure(isAsync);
 
-            AssertSql(
-                @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
-FROM [Customers] AS [c]
-WHERE [c].[CustomerID] = N'ALFKI'",
-                //
-                @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
-FROM [Customers] AS [c]
-WHERE [c].[CustomerID] = N'ALFKI'");
-        }
+        //            AssertSql(
+        //                @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
+        //FROM [Customers] AS [c]
+        //WHERE [c].[CustomerID] = N'ALFKI'",
+        //                //
+        //                @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
+        //FROM [Customers] AS [c]
+        //WHERE [c].[CustomerID] = N'ALFKI'");
+        //        }
 
         private void AssertSql(params string[] expected)
             => Fixture.TestSqlLoggerFactory.AssertBaseline(expected);

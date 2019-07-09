@@ -48,7 +48,7 @@ namespace Microsoft.EntityFrameworkCore.Query
         }
 
         // also issue #15264
-        [ConditionalFact(Skip = "Issue #14935. Cannot eval 'where ClientMethod([p])'")] 
+        [ConditionalFact(Skip = "Issue #14935. Cannot eval 'where ClientMethod([p])'")]
         public virtual void Client_eval()
         {
             Assert.Equal(69, _context.Products.ToList().Count);
@@ -146,20 +146,20 @@ namespace Microsoft.EntityFrameworkCore.Query
             Assert.Equal(5, results.Count);
         }
 
-        [ConditionalFact(Skip = "issue #15264")]
-        public virtual void Compiled_query()
-        {
-            var query = EF.CompileQuery(
-                (NorthwindContext context, string customerID)
-                    => context.Customers.Where(c => c.CustomerID == customerID));
+        //[ConditionalFact(Skip = "issue #15264")]
+        //public virtual void Compiled_query()
+        //{
+        //    var query = EF.CompileQuery(
+        //        (NorthwindContext context, string customerID)
+        //            => context.Customers.Where(c => c.CustomerID == customerID));
 
-            Assert.Equal("BERGS", query(_context, "BERGS").First().CustomerID);
+        //    Assert.Equal("BERGS", query(_context, "BERGS").First().CustomerID);
 
-            using (var context = CreateContext())
-            {
-                Assert.Equal("BLAUS", query(context, "BLAUS").First().CustomerID);
-            }
-        }
+        //    using (var context = CreateContext())
+        //    {
+        //        Assert.Equal("BLAUS", query(context, "BLAUS").First().CustomerID);
+        //    }
+        //}
 
         protected NorthwindContext CreateContext() => Fixture.CreateContext();
 

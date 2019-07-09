@@ -254,20 +254,20 @@ namespace Microsoft.EntityFrameworkCore.Query
             }
         }
 
-        [ConditionalFact(Skip = "Compiled queries not yet supported, #14551")]
-        public virtual void FromSqlRaw_queryable_composed_compiled()
-        {
-            var query = EF.CompileQuery(
-                (NorthwindContext context) => context.Set<Customer>().FromSqlRaw(NormalizeDelimetersInRawString("SELECT * FROM [Customers]"))
-                    .Where(c => c.ContactName.Contains("z")));
+        //[ConditionalFact(Skip = "Compiled queries not yet supported, #14551")]
+        //public virtual void FromSqlRaw_queryable_composed_compiled()
+        //{
+        //    var query = EF.CompileQuery(
+        //        (NorthwindContext context) => context.Set<Customer>().FromSqlRaw(NormalizeDelimetersInRawString("SELECT * FROM [Customers]"))
+        //            .Where(c => c.ContactName.Contains("z")));
 
-            using (var context = CreateContext())
-            {
-                var actual = query(context).ToArray();
+        //    using (var context = CreateContext())
+        //    {
+        //        var actual = query(context).ToArray();
 
-                Assert.Equal(14, actual.Length);
-            }
-        }
+        //        Assert.Equal(14, actual.Length);
+        //    }
+        //}
 
         [ConditionalFact]
         public virtual void FromSqlRaw_composed_contains()

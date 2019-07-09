@@ -14,28 +14,28 @@ namespace Microsoft.EntityFrameworkCore.Query
         {
         }
 
-        [ConditionalFact(Skip = "See issue#13857")]
-        public override void DbQuery_query()
-        {
-            base.DbQuery_query();
-        }
+        //[ConditionalFact(Skip = "See issue#13857")]
+        //public override void DbQuery_query()
+        //{
+        //    base.DbQuery_query();
+        //}
 
-        [ConditionalFact(Skip = "See issue#13857")]
-        public override Task DbQuery_query_async()
-        {
-            return base.DbQuery_query_async();
-        }
+        //[ConditionalFact(Skip = "See issue#13857")]
+        //public override Task DbQuery_query_async()
+        //{
+        //    return base.DbQuery_query_async();
+        //}
 
-        [ConditionalFact(Skip = "See issue#13857")]
-        public override void DbQuery_query_first()
-        {
-            base.DbQuery_query_first();
-        }
+        //[ConditionalFact(Skip = "See issue#13857")]
+        //public override void DbQuery_query_first()
+        //{
+        //    base.DbQuery_query_first();
+        //}
 
-        [ConditionalFact(Skip = "See issue#13857")]
-        public override Task DbQuery_query_first_async()
-        {
-            return base.DbQuery_query_first_async();
-        }
+        //[ConditionalFact(Skip = "See issue#13857")]
+        //public override Task DbQuery_query_first_async()
+        //{
+        //    return base.DbQuery_query_first_async();
+        //}
     }
 }

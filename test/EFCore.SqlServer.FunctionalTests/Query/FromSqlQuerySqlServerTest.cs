@@ -71,17 +71,17 @@ FROM (
 WHERE CHARINDEX(N'z', [c].[ContactName]) > 0");
         }
 
-        public override void FromSqlRaw_queryable_composed_compiled()
-        {
-            base.FromSqlRaw_queryable_composed_compiled();
+//        public override void FromSqlRaw_queryable_composed_compiled()
+//        {
+//            base.FromSqlRaw_queryable_composed_compiled();
 
-            AssertSql(
-                @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
-FROM (
-    SELECT * FROM ""Customers""
-) AS [c]
-WHERE CHARINDEX(N'z', [c].[ContactName]) > 0");
-        }
+//            AssertSql(
+//                @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
+//FROM (
+//    SELECT * FROM ""Customers""
+//) AS [c]
+//WHERE CHARINDEX(N'z', [c].[ContactName]) > 0");
+//        }
 
         public override void FromSqlRaw_composed_contains()
         {

@@ -94,18 +94,9 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
                 = _compiledQueryCache
                     .GetOrAddQuery(
                         _compiledQueryCacheKeyGenerator.GenerateCacheKey(query, async: false),
-                        () => CompileQueryCore<TResult>(_database, query, _model, false));
+                        () => _database.CompileQuery<TResult>(query, async: false));
 
             return compiledQuery(queryContext);
-        }
-
-        public virtual Func<QueryContext, TResult> CompileQueryCore<TResult>(
-            IDatabase database,
-            Expression query,
-            IModel model,
-            bool async)
-        {
-            return database.CompileQuery<TResult>(query, async);
         }
 
         /// <summary>
@@ -120,8 +111,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
 
             query = ExtractParameters(query, _queryContextFactory.Create(), _logger, parameterize: false);
 
-            //return CompileQueryCore<TResult>(query, _model, _queryModelGenerator, _database, _logger, _contextType);
-            throw new NotImplementedException();
+            return _database.CompileQuery<TResult>(query, async: false);
         }
 
         public virtual TResult ExecuteAsync<TResult>(Expression query, CancellationToken cancellationToken = default)
@@ -138,7 +128,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
                 = _compiledQueryCache
                     .GetOrAddQuery(
                         _compiledQueryCacheKeyGenerator.GenerateCacheKey(query, async: true),
-                        () => CompileQueryCore<TResult>(_database, query, _model, true));
+                        () => _database.CompileQuery<TResult>(query, async: true));
 
             return compiledQuery(queryContext);
         }
@@ -155,8 +145,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
 
             query = ExtractParameters(query, _queryContextFactory.Create(), _logger, parameterize: false);
 
-            //return CompileAsyncQueryCore<TResult>(query, _queryModelGenerator, _database);
-            throw new NotImplementedException();
+            return _database.CompileQuery<TResult>(query, async: true);
         }
 
         /// <summary>
